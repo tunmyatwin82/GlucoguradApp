@@ -1,10 +1,11 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { addDoc, collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+// Linking ကို ဒီမှာ ထည့်ထားပါတယ်
+import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from "react-native-chart-kit";
 import { Appbar, Button, Card, Chip, List, RadioButton, Text, TextInput } from 'react-native-paper';
-import { db } from '../../firebaseConfig'; // သင့်ဖိုင်လမ်းကြောင်းကို သေချာစစ်ပါ
+import { db } from '../../firebaseConfig';
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -15,10 +16,9 @@ export default function App() {
   const [chartData, setChartData] = useState({ labels: [], data: [] });
   const [isPremium, setIsPremium] = useState(false); 
   const [date, setDate] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false); // iOS အတွက်သာ
+  const [showPicker, setShowPicker] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
 
-  // ၁။ Database မှ ဒေတာများ ရယူခြင်း
   useEffect(() => {
     const q = query(collection(db, "glucoseLogs"), orderBy("timestamp", "desc"), limit(10));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -36,7 +36,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // ၂။ Android အတွက် DatePicker Error ကင်းအောင် ပြင်ဆင်ခြင်း
   const showAndroidPicker = () => {
     DateTimePickerAndroid.open({
       value: date,
@@ -50,7 +49,6 @@ export default function App() {
     });
   };
 
-  // ၃။ သွေးချိုအခြေအနေ Reference Logic
   const getStatus = (level, type) => {
     const val = parseInt(level);
     if (type === 'fasting') {
@@ -64,7 +62,6 @@ export default function App() {
     }
   };
 
-  // ၄။ ဒေတာသိမ်းခြင်း
   const saveLog = async () => {
     if (!glucose || isNaN(parseInt(glucose))) return Alert.alert("ဂဏန်းအမှန်အတိုင်း ထည့်ပါ");
     const statusInfo = getStatus(glucose, mealType);
@@ -85,6 +82,19 @@ export default function App() {
     }
   };
 
+  const handleSendToTelegram = () => {
+    const phoneNumber = "959421068582"; // ဖုန်းနံပါတ် + မလိုဘဲ စမ်းကြည့်ပါ
+    const message = "ကျွန်တော် GlycoGuard Premium အတွက် ငွေလွှဲထားတဲ့ Screenshot ပို့ပေးလိုက်ပါတယ်။";
+    const url = `https://t.me/+${phoneNumber}?text=${encodeURIComponent(message)}`;
+
+    Linking.canOpenURL(url).then(supported => {
+      Linking.openURL(url);
+    }).catch(() => {
+      Linking.openURL(url); // Browser မှတစ်ဆင့် ထပ်မံကြိုးစားခြင်း
+    });
+    setPaymentModal(false);
+  };
+
   return (
     <View style={styles.container}>
       <Appbar.Header elevated style={{ backgroundColor: '#6200ee' }}>
@@ -98,7 +108,6 @@ export default function App() {
       </Appbar.Header>
 
       <ScrollView style={{ padding: 15 }}>
-        {/* မှတ်တမ်းသွင်းရန် Form */}
         <Card style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={{marginBottom: 10}}>မှတ်တမ်းသစ်ထည့်ရန်</Text>
@@ -136,7 +145,6 @@ export default function App() {
                {date.toLocaleDateString()} | {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Button>
 
-            {/* iOS အတွက် DateTimePicker Component */}
             {Platform.OS === 'ios' && showPicker && (
               <DateTimePicker
                 value={date}
@@ -155,7 +163,6 @@ export default function App() {
           </Card.Content>
         </Card>
 
-        {/* 📊 ခြုံငုံသုံးသပ်ချက် Chart Section */}
         <Text style={styles.sectionTitle}>📊 ခြုံငုံသုံးသပ်ချက် (Trends)</Text>
         <Card style={[styles.card, { backgroundColor: isPremium ? '#fff' : '#f8f8f8' }]}>
           <Card.Content>
@@ -183,7 +190,6 @@ export default function App() {
           </Card.Content>
         </Card>
 
-        {/* 📋 ယခင်မှတ်တမ်းများ List */}
         <Text style={styles.sectionTitle}>📋 ယခင်မှတ်တမ်းများ</Text>
         {logs.map((item) => {
           const statusInfo = getStatus(item.level, item.mealType);
@@ -201,7 +207,6 @@ export default function App() {
         <View style={{height: 50}} /> 
       </ScrollView>
 
-      {/* 💳 Payment Modal with QR Images */}
       <Modal visible={paymentModal} onRequestClose={() => setPaymentModal(false)} animationType="slide">
         <View style={styles.modalContainer}>
             <Appbar.Header style={{ backgroundColor: 'white' }}>
@@ -211,7 +216,7 @@ export default function App() {
             
             <ScrollView contentContainerStyle={styles.modalContent}>
                 <Text variant="headlineSmall" style={styles.priceTag}>Premium Plan: 5,000 Ks</Text>
-                <Text style={styles.modalSubText}>အောက်ပါ QR တစ်ခုခုကို Scan ဖတ်၍ ငွေလွှဲပါ။ ပြီးလျှင် Screenshot ကို Admin ထံ ပေးပို့ပါ။</Text>
+                <Text style={styles.modalSubText}>အောက်ပါ QR တစ်ခုခုကို Scan ဖတ်၍ ငွေလွှဲပါ။ ပြီးလျှင် Screenshot ကို Telegram မှတစ်ဆင့် Admin ထံ ပေးပို့ပါ။</Text>
                 
                 <View style={styles.qrWrapper}>
                     <Text style={styles.qrTitle}>KBZPay</Text>
@@ -228,11 +233,13 @@ export default function App() {
                     <Image source={require('../../assets/images/cbpay.jpg')} style={styles.qrImage} resizeMode="contain" />
                 </View>
 
-                <Button mode="contained" onPress={() => {
-                    Alert.alert("စစ်ဆေးနေဆဲ", "Admin မှ အတည်ပြုပြီးပါက Premium Feature များ ပွင့်လာပါမည်။");
-                    setPaymentModal(false);
-                }} style={styles.confirmButton}>
-                    ငွေလွှဲပြီးပြီ (Screenshot ပို့မည်)
+                <Button 
+                  mode="contained" 
+                  onPress={handleSendToTelegram} 
+                  style={styles.confirmButton}
+                  icon="telegram" 
+                >
+                  Telegram သို့ Screenshot ပို့မည်
                 </Button>
             </ScrollView>
         </View>
@@ -241,7 +248,6 @@ export default function App() {
   );
 }
 
-// Chart Style Configuration
 const chartConfig = {
     backgroundColor: "#fff",
     backgroundGradientFrom: "#fff",
