@@ -1,7 +1,6 @@
-import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { addDoc, collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-// Linking ကို ဒီမှာ ထည့်ထားပါတယ်
 import { Alert, Dimensions, Image, Linking, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { LineChart } from "react-native-chart-kit";
 import { Appbar, Button, Card, Chip, List, RadioButton, Text, TextInput } from 'react-native-paper';
@@ -19,6 +18,7 @@ export default function App() {
   const [showPicker, setShowPicker] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
 
+  // ၁။ Database မှ ဒေတာများ ရယူခြင်း
   useEffect(() => {
     const q = query(collection(db, "glucoseLogs"), orderBy("timestamp", "desc"), limit(10));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -36,19 +36,19 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // ၂။ Android Picker Logic
   const showAndroidPicker = () => {
     DateTimePickerAndroid.open({
       value: date,
       onChange: (event, selectedDate) => {
-        if (event.type === 'set' && selectedDate) {
-          setDate(selectedDate);
-        }
+        if (event.type === 'set' && selectedDate) setDate(selectedDate);
       },
       mode: 'datetime',
       is24Hour: true,
     });
   };
 
+  // ၃။ သွေးချိုအခြေအနေ Reference Logic
   const getStatus = (level, type) => {
     const val = parseInt(level);
     if (type === 'fasting') {
@@ -62,6 +62,7 @@ export default function App() {
     }
   };
 
+  // ၄။ ဒေတာသိမ်းခြင်း
   const saveLog = async () => {
     if (!glucose || isNaN(parseInt(glucose))) return Alert.alert("ဂဏန်းအမှန်အတိုင်း ထည့်ပါ");
     const statusInfo = getStatus(glucose, mealType);
@@ -82,15 +83,14 @@ export default function App() {
     }
   };
 
+  // ၅။ Telegram သို့ သွားမည့် Function
   const handleSendToTelegram = () => {
-    const phoneNumber = "959421068582"; // ဖုန်းနံပါတ် + မလိုဘဲ စမ်းကြည့်ပါ
-    const message = "ကျွန်တော် GlycoGuard Premium အတွက် ငွေလွှဲထားတဲ့ Screenshot ပို့ပေးလိုက်ပါတယ်။";
-    const url = `https://t.me/+${phoneNumber}?text=${encodeURIComponent(message)}`;
+    const telegramUsername = "drtundmservice"; 
+    const message = "GlycoGuard Premium အဆင့်မြှင့်ရန် ငွေလွှဲထားပါသည်။ ဤတွင် Screenshot တင်ပေးလိုက်ပါတယ်။";
+    const url = `https://t.me/${telegramUsername}?text=${encodeURIComponent(message)}`;
 
-    Linking.canOpenURL(url).then(supported => {
-      Linking.openURL(url);
-    }).catch(() => {
-      Linking.openURL(url); // Browser မှတစ်ဆင့် ထပ်မံကြိုးစားခြင်း
+    Linking.openURL(url).catch(() => {
+        Alert.alert("Error", "Telegram App ကို ဖွင့်၍မရပါ။");
     });
     setPaymentModal(false);
   };
@@ -108,10 +108,10 @@ export default function App() {
       </Appbar.Header>
 
       <ScrollView style={{ padding: 15 }}>
+        {/* မှတ်တမ်းသွင်းရန် Form */}
         <Card style={styles.card}>
-          <Card.Content>
+            <Card.Content>
             <Text variant="titleMedium" style={{marginBottom: 10}}>မှတ်တမ်းသစ်ထည့်ရန်</Text>
-            
             <View style={styles.radioGroup}>
                 <View style={styles.radioItem}>
                     <RadioButton value="fasting" status={ mealType === 'fasting' ? 'checked' : 'unchecked' } onPress={() => setMealType('fasting')} />
@@ -122,91 +122,46 @@ export default function App() {
                     <Text onPress={() => setMealType('afterMeal')}>အစာစားပြီး</Text>
                 </View>
             </View>
-
             <Text style={styles.referenceText}>
                 ℹ️ {mealType === 'fasting' ? "Target Range: 70 - 130 mg/dL" : "Target Range: < 180 mg/dL (စားပြီး ၂ နာရီ)"}
             </Text>
-            
-            <TextInput
-              label="သွေးချိုပမာဏ (mg/dL)"
-              value={glucose}
-              onChangeText={setGlucose}
-              keyboardType="numeric"
-              mode="outlined"
-              style={{ marginBottom: 15 }}
-            />
-            
-            <Button 
-                mode="outlined" 
-                onPress={() => Platform.OS === 'android' ? showAndroidPicker() : setShowPicker(true)} 
-                icon="calendar" 
-                style={{marginBottom: 10}}
-            >
+            <TextInput label="သွေးချိုပမာဏ (mg/dL)" value={glucose} onChangeText={setGlucose} keyboardType="numeric" mode="outlined" style={{ marginBottom: 15 }} />
+            <Button mode="outlined" onPress={() => Platform.OS === 'android' ? showAndroidPicker() : setShowPicker(true)} icon="calendar" style={{marginBottom: 10}}>
                {date.toLocaleDateString()} | {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Button>
-
-            {Platform.OS === 'ios' && showPicker && (
-              <DateTimePicker
-                value={date}
-                mode="datetime"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowPicker(false);
-                  if (selectedDate) setDate(selectedDate);
-                }}
-              />
-            )}
-            
-            <Button mode="contained" onPress={saveLog} style={{ backgroundColor: '#6200ee' }}>
-              မှတ်တမ်းသိမ်းမည်
-            </Button>
-          </Card.Content>
+            <Button mode="contained" onPress={saveLog} style={{ backgroundColor: '#6200ee' }}>မှတ်တမ်းသိမ်းမည်</Button>
+            </Card.Content>
         </Card>
 
+        {/* Chart နှင့် Trends */}
         <Text style={styles.sectionTitle}>📊 ခြုံငုံသုံးသပ်ချက် (Trends)</Text>
         <Card style={[styles.card, { backgroundColor: isPremium ? '#fff' : '#f8f8f8' }]}>
-          <Card.Content>
-            {isPremium ? (
-              chartData.data.length > 0 ? (
-                <LineChart
-                    data={{
-                    labels: chartData.labels,
-                    datasets: [{ data: chartData.data }]
-                    }}
-                    width={screenWidth - 60}
-                    height={220}
-                    yAxisSuffix=" mg"
-                    chartConfig={chartConfig}
-                    bezier
-                    style={{ borderRadius: 16 }}
-                />
-              ) : <Text style={{textAlign: 'center', padding: 20}}>ဒေတာ မလုံလောက်သေးပါ</Text>
-            ) : (
-              <View style={{padding: 20, alignItems: 'center'}}>
-                  <Text style={{ color: 'grey', textAlign: 'center', marginBottom: 10 }}>Premium ဝယ်ယူပြီး အတက်အကျ ဇယားကို ကြည့်ပါ။</Text>
-                  <Button mode="text" onPress={() => setPaymentModal(true)}>Upgrade to View Chart</Button>
-              </View>
-            )}
-          </Card.Content>
+            <Card.Content>
+                {isPremium ? (
+                    chartData.data.length > 0 ? (
+                        <LineChart data={{ labels: chartData.labels, datasets: [{ data: chartData.data }] }} width={screenWidth - 60} height={220} yAxisSuffix=" mg" chartConfig={chartConfig} bezier style={{ borderRadius: 16 }} />
+                    ) : <Text style={{textAlign: 'center', padding: 20}}>ဒေတာ မလုံလောက်သေးပါ</Text>
+                ) : (
+                    <View style={{padding: 20, alignItems: 'center'}}>
+                        <Text style={{ color: 'grey', textAlign: 'center', marginBottom: 10 }}>Premium ဝယ်ယူပြီး အတက်အကျ ဇယားကို ကြည့်ပါ။</Text>
+                        <Button mode="text" onPress={() => setPaymentModal(true)}>Upgrade to View Chart</Button>
+                    </View>
+                )}
+            </Card.Content>
         </Card>
 
+        {/* ယခင်မှတ်တမ်းများ */}
         <Text style={styles.sectionTitle}>📋 ယခင်မှတ်တမ်းများ</Text>
         {logs.map((item) => {
           const statusInfo = getStatus(item.level, item.mealType);
           return (
-            <List.Item
-              key={item.id}
-              title={`${item.level} mg/dL`}
-              description={`${statusInfo.label} | ${item.mealType === 'fasting' ? 'အစာမစားခင်' : 'စားပြီး'} \n${item.dateString} ${item.timeString}`}
-              descriptionNumberOfLines={2}
-              left={props => <List.Icon {...props} icon="water" color={statusInfo.color} />}
-              style={styles.listItem}
-            />
+            <List.Item key={item.id} title={`${item.level} mg/dL`} description={`${statusInfo.label} | ${item.mealType === 'fasting' ? 'အစာမစားခင်' : 'စားပြီး'} \n${item.dateString} ${item.timeString}`} descriptionNumberOfLines={2} left={props => <List.Icon {...props} icon="water" color={statusInfo.color} />} style={styles.listItem} />
           );
         })}
         <View style={{height: 50}} /> 
       </ScrollView>
 
+      {/* Payment Modal */}
       <Modal visible={paymentModal} onRequestClose={() => setPaymentModal(false)} animationType="slide">
         <View style={styles.modalContainer}>
             <Appbar.Header style={{ backgroundColor: 'white' }}>
@@ -216,31 +171,34 @@ export default function App() {
             
             <ScrollView contentContainerStyle={styles.modalContent}>
                 <Text variant="headlineSmall" style={styles.priceTag}>Premium Plan: 5,000 Ks</Text>
-                <Text style={styles.modalSubText}>အောက်ပါ QR တစ်ခုခုကို Scan ဖတ်၍ ငွေလွှဲပါ။ ပြီးလျှင် Screenshot ကို Telegram မှတစ်ဆင့် Admin ထံ ပေးပို့ပါ။</Text>
+                <Text style={styles.modalSubText}>အောက်ပါ QR များမှ အဆင်ပြေရာဖြင့် ငွေလွှဲပါ။ ပြီးလျှင် Telegram တွင် Screenshot ပို့ပေးပါ။</Text>
                 
-                <View style={styles.qrWrapper}>
-                    <Text style={styles.qrTitle}>KBZPay</Text>
-                    <Image source={require('../../assets/images/kbzpay.jpg')} style={styles.qrImage} resizeMode="contain" />
-                </View>
+                {/* Horizontal QR Section */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.qrScroll}>
+                    <View style={styles.qrWrapper}>
+                        <Text style={styles.qrTitle}>KBZPay</Text>
+                        <Image source={require('../../assets/images/kbzpay.jpg')} style={styles.qrImage} resizeMode="contain" />
+                    </View>
+                    <View style={styles.qrWrapper}>
+                        <Text style={styles.qrTitle}>CBPay</Text>
+                        <Image source={require('../../assets/images/cbpay.jpg')} style={styles.qrImage} resizeMode="contain" />
+                    </View>
+                    <View style={styles.qrWrapper}>
+                        <Text style={styles.qrTitle}>AYAPay</Text>
+                        <Image source={require('../../assets/images/ayapay.jpg')} style={styles.qrImage} resizeMode="contain" />
+                    </View>
+                </ScrollView>
 
-                <View style={styles.qrWrapper}>
-                    <Text style={styles.qrTitle}>AYAPay</Text>
-                    <Image source={require('../../assets/images/ayapay.jpg')} style={styles.qrImage} resizeMode="contain" />
+                <View style={{ width: '100%', paddingHorizontal: 20 }}>
+                    <Button 
+                    mode="contained" 
+                    onPress={handleSendToTelegram} 
+                    style={styles.confirmButton}
+                    icon="send" 
+                    >
+                    ငွေလွှဲပြီး Telegram သို့ သွားမည်
+                    </Button>
                 </View>
-
-                <View style={styles.qrWrapper}>
-                    <Text style={styles.qrTitle}>CBPay</Text>
-                    <Image source={require('../../assets/images/cbpay.jpg')} style={styles.qrImage} resizeMode="contain" />
-                </View>
-
-                <Button 
-                  mode="contained" 
-                  onPress={handleSendToTelegram} 
-                  style={styles.confirmButton}
-                  icon="telegram" 
-                >
-                  Telegram သို့ Screenshot ပို့မည်
-                </Button>
             </ScrollView>
         </View>
       </Modal>
@@ -268,11 +226,12 @@ const styles = StyleSheet.create({
   referenceText: { backgroundColor: '#e3f2fd', padding: 10, borderRadius: 5, color: '#1565c0', marginBottom: 15, fontSize: 12, textAlign: 'center' },
   sectionTitle: { marginTop: 25, fontWeight: 'bold', marginBottom: 10 },
   modalContainer: { flex: 1, backgroundColor: '#fff' },
-  modalContent: { alignItems: 'center', padding: 20 },
-  priceTag: { marginBottom: 10, fontWeight: 'bold', color: '#6200ee' },
-  modalSubText: { marginBottom: 20, textAlign: 'center', color: 'grey', fontSize: 13 },
-  qrWrapper: { alignItems: 'center', marginBottom: 25, backgroundColor: '#fff', padding: 15, borderRadius: 15, elevation: 4, width: '90%' },
+  modalContent: { alignItems: 'center', paddingVertical: 20 },
+  priceTag: { marginBottom: 10, fontWeight: 'bold', color: '#6200ee', textAlign: 'center' },
+  modalSubText: { marginBottom: 20, textAlign: 'center', color: 'grey', fontSize: 14, paddingHorizontal: 20 },
+  qrScroll: { paddingLeft: 20, marginBottom: 20 },
+  qrWrapper: { alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 15, elevation: 4, width: screenWidth * 0.75, marginRight: 20, marginBottom: 10 },
   qrTitle: { fontWeight: 'bold', marginBottom: 10, fontSize: 16 },
-  qrImage: { width: 220, height: 220 },
-  confirmButton: { marginTop: 10, width: '100%', padding: 5, backgroundColor: '#4CAF50', marginBottom: 30 }
+  qrImage: { width: 200, height: 200 },
+  confirmButton: { marginTop: 10, width: '100%', padding: 5, backgroundColor: '#4CAF50', marginBottom: 30 },
 });
